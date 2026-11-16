@@ -4,7 +4,8 @@
 (def params {:template (tpl/create-template)
              :artifact "krro-canvas-gl"
              :version "0.1.0"
-             :src-dirs ["src" "resources"]
+             :src-dirs ["src"]
+             :resource-dirs ["resources"]
              :compile-java? true})
 
 (defn clean [_]
