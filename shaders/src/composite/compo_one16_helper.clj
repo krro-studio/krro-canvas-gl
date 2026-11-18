@@ -4,10 +4,13 @@
 ;; ── 宏辅助 ────────────────────────────────────────────
 
 (def ^:private common-args
-  "所有合成 shader 共用的采样参数，顺序固定。"
+  "所有合成 shader 共用的采样参数，顺序固定，与 comp-one 的形参一一对应。"
   ['composite.tile-layout/uTileSize
    'composite.tile-layout/uImageMinPoint
    'composite.tile-layout/uImageMaxPoint
+   'composite.tile-layout/uScreenToImage4
+   'composite.tile-layout/uScreenToImage2
+   'composite.tile-layout/uOverflowPolicy
    'composite.comp-one16/uIndexTable
    'composite.comp-one16/uTileTable
    'composite.comp-one16/uLayerTable

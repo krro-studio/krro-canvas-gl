@@ -4,7 +4,6 @@ import top.kzre.colorutils.blend.Blends;
 import top.kzre.krro.canvas.gl.composite.shaders.NormalShader;
 import top.kzre.krro.canvas.gl.resource.GLBindable;
 import top.kzre.krro.canvas.gl.resource.GLProgramCache;
-import top.kzre.krro.canvas.gl.util.Tuple4f;
 
 public final class SimpleNormalShaderFactory implements ShaderFactory {
     public static final ShaderFactory INSTANCE = new SimpleNormalShaderFactory();
@@ -17,8 +16,8 @@ public final class SimpleNormalShaderFactory implements ShaderFactory {
         ShaderLayerTileSet tileSet = context.getTileSet();
         int tileSize = context.getContext().getTileSize();
         GLProgramCache programs = compositeContext.getProgramCache();
-        Tuple4f imageAABB = context.getImageAABB();
+        ImageRegion imageRegion = context.getImageRegion();
         return new NormalShader(
-                () -> programs.get(Blends.NORMAL), tileSet, viewInfo, tileSize, bindables, imageAABB);
+                () -> programs.get(Blends.NORMAL), tileSet, viewInfo, tileSize, bindables, imageRegion);
     }
 }

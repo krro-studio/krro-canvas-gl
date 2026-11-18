@@ -7,7 +7,6 @@ import top.kzre.krro.canvas.gl.resource.GLTexture;
 import top.kzre.krro.canvas.gl.tile.GLAtlas;
 import top.kzre.krro.canvas.gl.tile.GLTile;
 import top.kzre.krro.canvas.gl.tile.GLTileDescriptor;
-import top.kzre.krro.canvas.gl.util.Tuple4f;
 import top.kzre.krro.util.tile.Tile;
 
 import java.util.ArrayList;
@@ -24,6 +23,9 @@ import java.util.function.Supplier;
  *   <li>{@code uTextureScales} —— 每个 bindable 的 (1/edgeU, 1/edgeV)</li>
  *   <li>{@code uTileTable} / {@code uLayerTable} / {@code uIndexTable}
  *       —— 本 group 的三张 buffer 表单元</li>
+ *   <li>{@code uImageMinPoint} / {@code uImageMaxPoint} —— 图像范围（图像空间）</li>
+ *   <li>{@code uScreenToImage4} / {@code uScreenToImage2} —— 视口像素 → 图像像素的仿射逆变换</li>
+ *   <li>{@code uOverflowPolicy} —— 溢出显示策略，1 表示裁剪到图像范围</li>
  *   <li>{@code uTexture0..N} —— 纹理采样器，指向 unit 0..N</li>
  * </ul>
  *
@@ -48,7 +50,7 @@ public final class NormalShader extends AbstractShader {
     private final ViewTileInfo viewTileInfo;
     private final GLBindable[] bindables;
     private final int tileSize;
-    private final Tuple4f imageAABB;
+    private final ImageRegion imageRegion;
 
     /**
      * @param program      已编译的 GLProgram
@@ -56,15 +58,16 @@ public final class NormalShader extends AbstractShader {
      * @param viewTileInfo 屏幕瓦片网格 + 视口尺寸
      * @param tileSize     瓦片边长——安全冗余，需与 viewTileInfo 一致
      * @param bindables    纹理布局——顺序即单元号
+     * @param imageRegion  图像范围 + 视口逆变换 + 溢出策略
      */
     public NormalShader(Supplier<GLProgram> program,
                         ShaderLayerTileSet tileSet,
                         ViewTileInfo viewTileInfo,
                         int tileSize,
-                        GLBindable[] bindables, Tuple4f imageAABB) {
+                        GLBindable[] bindables, ImageRegion imageRegion) {
 
         super(program, bindables, tileSet.getLayerTileRefs());
-        this.imageAABB = imageAABB;
+        this.imageRegion = imageRegion;
 
         if (bindables == null) {
             throw new IllegalArgumentException("bindables must not be null");
@@ -75,8 +78,8 @@ public final class NormalShader extends AbstractShader {
         if (bindables.length > ShaderConstants.MAX_LAYER_TEXTURE_UNIT_COUNT) {
             throw new IllegalArgumentException("bindables must not exceed MAX_LAYER_TEXTURE_UNIT_COUNT");
         }
-        if (imageAABB == null) {
-            throw new IllegalArgumentException("imageAABB must not be null");
+        if (imageRegion == null) {
+            throw new IllegalArgumentException("imageRegion must not be null");
         }
 
         this.tileSet = tileSet;
@@ -144,9 +147,17 @@ public final class NormalShader extends AbstractShader {
         p.setVec2IfPresent("uViewport", viewWidth, viewHeight);
         p.setFloatIfPresent("uTileSize", tileSize);
 
-        // ── 图像范围 AABB（视口空间）──
-        p.setVec2IfPresent("uImageMinPoint", imageAABB.x(), imageAABB.y());
-        p.setVec2IfPresent("uImageMaxPoint", imageAABB.z(), imageAABB.w());
+        // ── 图像范围（图像空间）——像素要先经视口逆变换回到这里再比较 ──
+        float[] screenToImage = imageRegion.getScreenToImage();
+        p.setVec2IfPresent("uImageMinPoint", imageRegion.getMinX(), imageRegion.getMinY());
+        p.setVec2IfPresent("uImageMaxPoint", imageRegion.getMaxX(), imageRegion.getMaxY());
+        p.setVec4IfPresent("uScreenToImage4",
+                screenToImage[0], screenToImage[1], screenToImage[2], screenToImage[3]);
+        p.setVec4IfPresent("uScreenToImage2",
+                screenToImage[4], screenToImage[5], 0.0f, 0.0f);
+
+        // ── 溢出策略：1 = 裁剪到图像范围，0 = 可见 ──
+        p.setIntIfPresent("uOverflowPolicy", imageRegion.isClip() ? 1 : 0);
 
         // ── 本 group 的三张 buffer 表单元 ──
         p.setIntIfPresent("uTileTable", ShaderConstants.TEXTURE_UNIT_TILE_TABLE);

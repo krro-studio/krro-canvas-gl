@@ -7,16 +7,26 @@
     [top.kzre.krro.core.util.promise :as promise]
     [top.kzre.krro.core.util.tracker :as tracker])
   (:import
-    (top.kzre.krro.canvas.gl.composite GLCompositeContext Render)
-    (top.kzre.krro.canvas.gl.util Tuple4f)
+    (top.kzre.krro.canvas.gl.composite GLCompositeContext ImageRegion Overflow Render)
     (top.kzre.krro.util.tile TiledCanvas)))
 
+(defn- kw->overflow [kw]
+  (case kw
+    :clip Overflow/CLIP
+    :visible Overflow/VISIBLE
+    Overflow/CLIP))
 
 (defmethod batch/render-batch :gl
   [_ ^TiledCanvas backdrop-canvas layer-stack
    {:keys [dirty-tiles tile-size gl-composite-context
-           view-width view-height
-           image-width image-height image-aabb image-tiles]
+           ;; 视口宽高，视口变换(mat2d，图像 -> 视口)
+           view-width view-height viewport view-matrix
+           ;; 图像宽高（图像空间像素）
+           image-width image-height
+           ;; 图层盖出图像范围时的显示策略
+           overflow]
+    ;; 溢出图像范围默认裁剪
+    :or {overflow :clip}
     :as   opts}]
   {:pre [(instance? GLCompositeContext gl-composite-context)
          (= tile-size (.getTileSize ^GLCompositeContext gl-composite-context))
@@ -24,7 +34,15 @@
          (not= (.getId (Thread/currentThread))
                (.getThreadId (.getGlExecutor gl-composite-context)))]}
   (log/info "gl render-batch")
-  (let [^GLCompositeContext ctx gl-composite-context]
+  (let [overflow (kw->overflow overflow)
+        ^GLCompositeContext ctx gl-composite-context
+        ;; 图像尺寸或视口矩阵缺失（首帧、还没定图像大小）时按“无边界”处理——
+        ;; 拿 0 尺寸去裁剪会把整幅画面裁空。
+        ^ImageRegion image-region
+        (if (and (some? image-width) (some? image-height) (some? view-matrix))
+          (ImageRegion/of (double image-width) (double image-height)
+                          view-matrix overflow)
+          (ImageRegion/none))]
     (if (or (nil? layer-stack)
             (empty? layer-stack)
             (empty? dirty-tiles))
@@ -42,8 +60,7 @@
                                 layers)
                           ctx
                           (int view-width) (int view-height)
-                          (Tuple4f. (:min-x image-aabb) (:min-y image-aabb)
-                                    (:max-x image-aabb) (:max-y image-aabb))
+                          image-region
                           dirty-tiles))
                       (catch Throwable t
                         (log/error t "render failed")

@@ -154,4 +154,14 @@ public final class FBOUtils {
         int paddingHeight = texHeight - actualHeight;
         GL11.glViewport(0, paddingHeight, actualWidth, actualHeight);
     }
+
+    public static void glViewport(
+            int _fboWidth, int fboHeight,
+            int actualWidth, int actualHeight) {
+        int paddingHeight = fboHeight - actualHeight;
+        GL11.glViewport(0,
+                // 范围保护
+                Math.max(paddingHeight, 0),
+                actualWidth, actualHeight);
+    }
 }

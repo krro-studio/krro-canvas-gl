@@ -3,7 +3,9 @@
 
    ── 通用配置 ──────────────────────────────────────────
    ▸ uTileSize / uViewport         —— vertex 坐标变换
-   ▸ uImageMinPoint / uImageMaxPoint —— fragment 边界裁剪
+   ▸ uImageMinPoint / uImageMaxPoint —— 图像范围（图像空间，左闭右开）
+   ▸ uScreenToImage4 / uScreenToImage2 —— 视口像素 → 图像像素的仿射逆变换
+   ▸ uOverflowPolicy               —— 图层超出图像范围时的显示策略
 
    ── varying ──────────────────────────────────────────
    ▸ TileVarying —— VS out / FS in 共享
@@ -27,6 +29,9 @@
 (defuniform uViewport      float2)
 (defuniform uImageMinPoint float2)
 (defuniform uImageMaxPoint float2)
+(defuniform uScreenToImage4 float4)
+(defuniform uScreenToImage2 float4)
+(defuniform uOverflowPolicy int)
 
 ;; ═══════════════════════════════════════════
 ;; varying
@@ -55,3 +60,13 @@
           (+ (+ (* (:y mat2d4) (:x vpos))
                 (* (:w mat2d4) (:y vpos)))
              (:y mat2d2))))
+
+(defn ^:inline outside-image
+  "图像范围测试——左闭右开 [min, max)。
+
+   入参是图像空间坐标——由 layer-transform 配合
+   uScreenToImage4 / uScreenToImage2 从视口像素求得。
+   上界用 >= 而非 >：整数图像尺寸下 max 那一列在图像之外。"
+  [image-pixel image-min image-max]
+  (or (any (lessThan image-pixel image-min))
+      (any (greaterThanEqual image-pixel image-max))))

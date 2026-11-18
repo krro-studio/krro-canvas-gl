@@ -6,7 +6,6 @@ import top.kzre.krro.canvas.gl.resource.FixedSizeFrameBufferPool;
 import top.kzre.krro.canvas.gl.resource.GLTexture;
 import top.kzre.krro.canvas.gl.tile.FBOUtils;
 import top.kzre.krro.canvas.gl.util.ExecutorUtils;
-import top.kzre.krro.canvas.gl.util.Tuple4f;
 import top.kzre.krro.core.util.SerialExecutor;
 import top.kzre.krro.util.tile.TiledCanvas;
 
@@ -16,6 +15,8 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 /**
+ * TODO 转换成单次构造调用+Builder 模式
+ *
  * 合成执行编排。从图层列表开始，到结果 canvas 返回，
  * 全流程在 Java 侧完成。
  *
@@ -39,7 +40,7 @@ public final class Render {
             List<ILayer> layers,
             GLCompositeContext ctx,
             int viewWidth, int viewHeight,
-            Tuple4f imageAABB,
+            ImageRegion imageRegion,
             Set<Long> dirtyTiles) {
 
         if (layers == null) {
@@ -48,8 +49,8 @@ public final class Render {
         if (ctx == null) {
             throw new IllegalArgumentException("ctx must not be null");
         }
-        if (imageAABB == null) {
-            throw new IllegalArgumentException("imageAABB must not be null");
+        if (imageRegion == null) {
+            throw new IllegalArgumentException("imageRegion must not be null");
         }
         if (dirtyTiles == null) {
             throw new IllegalArgumentException("dirtyTiles must not be null");
@@ -66,7 +67,7 @@ public final class Render {
         long tStart = System.nanoTime();
 
         return glAdjustViewSize(ctx, viewWidth, viewHeight)
-                .thenCompose(ignored -> doRender(layers, ctx, imageAABB, dirtyTiles, tStart));
+                .thenCompose(ignored -> doRender(layers, ctx, imageRegion, dirtyTiles, tStart));
     }
 
     // ═══════════════════════════════════════════════
@@ -76,7 +77,7 @@ public final class Render {
     private static CompletableFuture<TiledCanvas> doRender(
             List<ILayer> layers,
             GLCompositeContext ctx,
-            Tuple4f imageAABB,
+            ImageRegion imageRegion,
             Set<Long> dirtyTiles,
             long tStart) {
 
@@ -94,7 +95,7 @@ public final class Render {
                         pair -> {
                             long tAcquire = System.nanoTime();
                             return planAndSubmit(
-                                    pair, layers, ctx, imageAABB, dirtyTiles,
+                                    pair, layers, ctx, imageRegion, dirtyTiles,
                                     fboPool, glExecutor, tileSize,
                                     tStart, tCollect, tAcquire);
                         },
@@ -108,7 +109,7 @@ public final class Render {
             List<DefaultGLFramebuffer> pair,
             List<ILayer> layers,
             GLCompositeContext ctx,
-            Tuple4f imageAABB,
+            ImageRegion imageRegion,
             Set<Long> dirtyTiles,
             FixedSizeFrameBufferPool<DefaultGLFramebuffer> fboPool,
             SerialExecutor glExecutor,
@@ -122,7 +123,7 @@ public final class Render {
 
         CompositeRequest request;
         try {
-            request = CompositePlanner.plan(layers, ctx, fboA, fboB, imageAABB, dirtyTiles);
+            request = CompositePlanner.plan(layers, ctx, fboA, fboB, imageRegion, dirtyTiles);
         } catch (Throwable t) {
             fboPool.release(fboA);
             fboPool.release(fboB);
