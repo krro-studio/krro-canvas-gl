@@ -31,7 +31,7 @@ import static org.lwjgl.opengl.GL30.*;
  *
  * <p><b>线程契约</b>：仅 GL 线程调用；与使用它的 GL 上下文同寿。
  */
-public final class TiledTextureBlitter implements AutoCloseable {
+public final class TiledTextureBlitter implements ITiledTextureBlitter {
 
     /**
      * 纹理尺寸的对齐单位——通常是 tileSize。用于计算底部 padding 高度。
@@ -90,6 +90,7 @@ public final class TiledTextureBlitter implements AutoCloseable {
      * @throws IndexOutOfBoundsException layer 越界
      * @throws IllegalArgumentException  dstWidth 或 dstHeight &le; 0
      */
+    @Override
     public void blit(GLTexture texture,
                      int layer,
                      int srcWidth, int srcHeight,
