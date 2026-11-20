@@ -8,7 +8,6 @@ import top.kzre.krro.canvas.gl.util.NumberUtils;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
 import static org.lwjgl.opengl.GL13.glActiveTexture;
-import static org.lwjgl.opengl.GL14.*;
 import static org.lwjgl.opengl.GL30.*;
 
 /**
@@ -54,24 +53,28 @@ public final class TiledTextureCropBlitter implements AutoCloseable {
                     + "in vec2 vUv;\n"
                     + "uniform sampler2DArray uTex;\n"
                     + "uniform float uLayer;\n"
-                    + "uniform vec4 uSrcRect;\n"
+                    + "uniform vec4 uTileBounds;\n"
                     + "uniform vec2 uDstSize;\n"
-                    + "uniform vec2 uDrawSize;\n"
                     + "uniform vec2 uSrcSize;\n"
                     + "out vec4 frag;\n"
                     + "void main() {\n"
-                    // gl_FragCoord：像素中心坐标，y 向上；窗口锚定目标右上角
-                    + "    float minX = uDstSize.x - uDrawSize.x;\n"
-                    + "    float minY = uDstSize.y - uDrawSize.y;\n"
                     + "    vec2 p = gl_FragCoord.xy;\n"
-                    + "    if (p.x < minX || p.x >= uDstSize.x\n"
-                    + "     || p.y < minY || p.y >= uDstSize.y) {\n"
+                    // 物理越界
+                    + "    if (p.x < 0 || p.x >= uDstSize.x\n"
+                    + "     || p.y < 0 || p.y >= uDstSize.y) {\n"
+                    + "        discard;\n"
+                    + "    }\n"
+                    // 变换回旧帧
+                    + "    p = vec2(p.x, " +
+                    "            p.y - (uDstSize.y - uSrcSize.y) );\n"
+                    // 在旧帧中越界
+                    + "    if (p.x < 0 || p.x >= uSrcSize.x\n"
+                    + "     || p.y < 0 || p.y >= uSrcSize.y) {\n"
                     + "        discard;\n"
                     + "    }\n"
                     // 窗口内 1:1：local ∈ [0.5, draw-0.5] → uv 恰好落在纹素中心
                     // uSrcSize 已经是 srcWidth * dpi（物理像素），所以 local/uSrcSize 正确
-                    + "    vec2 local = p - vec2(minX, minY);\n"
-                    + "    vec2 uv = uSrcRect.xy + local / uSrcSize * (uSrcRect.zw - uSrcRect.xy);\n"
+                    + "    vec2 uv = uTileBounds.xy + p / uSrcSize * (uTileBounds.zw - uTileBounds.xy);\n"
                     // uv 越界直接丢弃，不产生采样误差，不 stretch
                     + "    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {\n"
                     + "        discard;\n"
@@ -148,20 +151,6 @@ public final class TiledTextureCropBlitter implements AutoCloseable {
         float srcPhysW = (float) (srcWidth * dpi);
         float srcPhysH = (float) (srcHeight * dpi);
 
-        // 物理像素空间裁剪窗口大小：不 stretch，取 min(dst, src*dpi)
-        // resize 剧烈时 dst 可以远大于 src*dpi，这是正常情况
-        int drawW = Math.min(dstWidth, (int) Math.ceil(srcPhysW));
-        int drawH = Math.min(dstHeight, (int) Math.ceil(srcPhysH));
-
-        boolean blendWas = glGetBoolean(GL_BLEND);
-        int srcRgbWas = glGetInteger(GL_BLEND_SRC_RGB);
-        int dstRgbWas = glGetInteger(GL_BLEND_DST_RGB);
-        int srcAlphaWas = glGetInteger(GL_BLEND_SRC_ALPHA);
-        int dstAlphaWas = glGetInteger(GL_BLEND_DST_ALPHA);
-        int activeTexWas = glGetInteger(GL_ACTIVE_TEXTURE);
-        int[] viewportWas = new int[4];
-        glGetIntegerv(GL_VIEWPORT, viewportWas);
-
         glBindFramebuffer(GL_FRAMEBUFFER, targetFbo);
         glViewport(0, 0, dstWidth, dstHeight);
         try {
@@ -171,13 +160,15 @@ public final class TiledTextureCropBlitter implements AutoCloseable {
             texture.bind(0);
             p.setInt("uTex", 0);
             p.setFloat("uLayer", layer);
-            // uSrcRect 不钳制——如实反映逻辑尺寸与纹理尺寸的比例
+            // uTileBounds 不钳制——如实反映逻辑尺寸与纹理尺寸的比例
             // uv 越界由 shader discard 处理，零误差、零 stretch
-            p.setVec4("uSrcRect",
-                    0.0f, (float) paddingH / texHeight,
+            p.setVec4("uTileBounds",
+                    // minPoint
+                    0.0f, (float) paddingH / texHeight ,
+                    // MaxPoint
                     (float) srcWidth / texWidth, 1.0f);
             p.setVec2("uDstSize", (float) dstWidth, (float) dstHeight);
-            p.setVec2("uDrawSize", (float) drawW, (float) drawH);
+
             p.setVec2("uSrcSize", srcPhysW, srcPhysH);
 
             glEnable(GL_BLEND);
@@ -190,15 +181,7 @@ public final class TiledTextureCropBlitter implements AutoCloseable {
 
             glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
         } finally {
-            glActiveTexture(activeTexWas);
             GLProgram.unuse();
-            if (blendWas) {
-                glEnable(GL_BLEND);
-                glBlendFuncSeparate(srcRgbWas, dstRgbWas, srcAlphaWas, dstAlphaWas);
-            } else {
-                glDisable(GL_BLEND);
-            }
-            glViewport(viewportWas[0], viewportWas[1], viewportWas[2], viewportWas[3]);
         }
     }
 
