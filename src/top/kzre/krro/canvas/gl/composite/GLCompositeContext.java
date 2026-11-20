@@ -89,7 +89,8 @@ public class GLCompositeContext implements AutoCloseable, GLThreadAffine {
     private FixedSizeDefaultFrameBufferPool createFboPool(int capacity, int width, int height) {
         FixedSizeTexturePool texturePool = new FixedSizeTexturePool(
                 capacity,
-                width, height, 2,
+                // layers 必须为1，不然共享上下文是不安全的
+                width, height, 1,
                 pixelFormat,
                 flyweight.getNoTexPool());
         try {
