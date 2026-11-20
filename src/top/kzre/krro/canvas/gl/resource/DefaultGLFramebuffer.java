@@ -10,6 +10,7 @@ import static org.lwjgl.opengl.GL30.glBindFramebuffer;
 import static org.lwjgl.opengl.GL30.glCheckFramebufferStatus;
 import static org.lwjgl.opengl.GL30.glDeleteFramebuffers;
 import static org.lwjgl.opengl.GL30.glFramebufferTextureLayer;
+import static org.lwjgl.opengl.GL32.GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS;
 
 /**
  * 默认的 FBO，只有颜色缓冲
@@ -106,11 +107,10 @@ public final class DefaultGLFramebuffer extends ColorAttachedFrameBuffer {
                 glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                         colorAttachment.getHandle(), 0, colorLayer);
 
+
                 int status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
                 if (status != GL_FRAMEBUFFER_COMPLETE) {
-                    throw new IllegalStateException(
-                            "FBO incomplete: status = 0x"
-                                    + Integer.toHexString(status));
+                    throwWithLog(status, fbo);
                 }
 
                 ok = true;
@@ -125,6 +125,57 @@ public final class DefaultGLFramebuffer extends ColorAttachedFrameBuffer {
                     fbo,colorAttachment.getWidth(), colorAttachment.getHeight(),
                     glThread,
                     colorAttachment, colorLayer
+            );
+        }
+
+        private void throwWithLog(int status, int fbo) {
+            // 收集诊断信息
+            int[] colorType = new int[1];
+            int[] colorName = new int[1];
+            glGetFramebufferAttachmentParameteriv(
+                    GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                    GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE, colorType);
+            glGetFramebufferAttachmentParameteriv(
+                    GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                    GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, colorName);
+
+            int texFormat = 0;
+            int texWidth = 0;
+            int texHeight = 0;
+            int texLayers = 0;
+            if (colorType[0] == GL_TEXTURE) {
+                glBindTexture(GL_TEXTURE_2D_ARRAY, colorName[0]);
+                int[] tmp = new int[1];
+                glGetTexLevelParameteriv(GL_TEXTURE_2D_ARRAY, 0,
+                        GL_TEXTURE_INTERNAL_FORMAT, tmp);
+                texFormat = tmp[0];
+                glGetTexLevelParameteriv(GL_TEXTURE_2D_ARRAY, 0,
+                        GL_TEXTURE_WIDTH, tmp);
+                texWidth = tmp[0];
+                glGetTexLevelParameteriv(GL_TEXTURE_2D_ARRAY, 0,
+                        GL_TEXTURE_HEIGHT, tmp);
+                texHeight = tmp[0];
+                glGetTexLevelParameteriv(GL_TEXTURE_2D_ARRAY, 0,
+                        GL_TEXTURE_DEPTH, tmp);
+                texLayers = tmp[0];
+            }
+
+            String statusHex = "0x" + Integer.toHexString(status);
+
+
+            throw new IllegalStateException(
+                    "FBO incomplete: " + " (" + statusHex + ")\n"
+                            + "colorAttachment: " +  colorAttachment
+                            + "  color attachment: type="
+                            + (colorType[0] == GL_TEXTURE ? "GL_TEXTURE"
+                            : colorType[0] == GL_RENDERBUFFER ? "GL_RENDERBUFFER"
+                              : "NONE(0x" + Integer.toHexString(colorType[0]) + ")")
+                            + ", name=" + colorName[0] + "\n"
+                            + "  texture: format=0x" + Integer.toHexString(texFormat)
+                            + ", size=" + texWidth + "x" + texHeight
+                            + ", layers=" + texLayers
+                            + ", requestedLayer=" + colorLayer + "\n"
+                            + "  fbo=" + fbo + "\n"
             );
         }
     }

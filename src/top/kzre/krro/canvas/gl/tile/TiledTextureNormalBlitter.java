@@ -39,7 +39,7 @@ import static org.lwjgl.opengl.GL30.*;
  */
 public final class TiledTextureNormalBlitter implements ITiledTextureBlitter {
 
-    private static final String VERT =
+     static final String VERT =
             "#version 330 core\n"
                     + "layout(location = 0) in vec2 aPos;\n"
                     + "out vec2 vUv;\n"
@@ -48,7 +48,7 @@ public final class TiledTextureNormalBlitter implements ITiledTextureBlitter {
                     + "    gl_Position = vec4(aPos.x * 2.0 - 1.0, aPos.y * 2.0 - 1.0, 0.0, 1.0);\n"
                     + "}\n";
 
-    private static final String FRAG =
+     static final String FRAG =
             "#version 330 core\n"
                     + "in vec2 vUv;\n"
                     + "uniform sampler2DArray uTex;\n"
@@ -93,6 +93,9 @@ public final class TiledTextureNormalBlitter implements ITiledTextureBlitter {
                      int srcWidth, int srcHeight,
                      int targetFbo,
                      int dstWidth, int dstHeight) {
+        System.out.println( "NormalBlitter: " +
+                "srcWidth=" + srcWidth + ", srcHeight=" + srcHeight +
+                "dstWidth=" + dstWidth + ", dstHeight=" + dstHeight);
         if (closed) {
             throw new IllegalStateException("TiledTextureNormalBlitter has been released");
         }

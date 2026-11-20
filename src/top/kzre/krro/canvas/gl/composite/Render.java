@@ -124,6 +124,7 @@ public final class Render {
 
         DefaultGLFramebuffer fboA = pair.get(0);
         DefaultGLFramebuffer fboB = pair.get(1);
+        System.out.println("CompositeTask fboA=" + fboA.getHandle() + ", fboB=" + fboB.getHandle());
 
         CompositeRequest request;
         try {

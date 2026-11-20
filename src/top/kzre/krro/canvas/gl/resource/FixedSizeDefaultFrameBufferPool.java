@@ -30,6 +30,9 @@ public final class FixedSizeDefaultFrameBufferPool
 
     @Override
     protected SlotHolder createHolder() {
+        if (texturePool.isClosed()){
+            throw new IllegalStateException("texture pool is closed");
+        }
         GLTexture tex = texturePool.acquire();
         boolean ok = false;
         try {

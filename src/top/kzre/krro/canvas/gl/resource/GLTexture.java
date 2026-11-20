@@ -502,7 +502,7 @@ public final class GLTexture implements GLBindable, AutoCloseable {
     @Override
     public String toString() {
         return "GLTexture{" +
-                "id=" + handle +
+                "handle=" + handle +
                 ", " + width + "x" + height + "x" + layers +
                 ", fmt=" + pixelFormat +
                 ", released=" + closed +
