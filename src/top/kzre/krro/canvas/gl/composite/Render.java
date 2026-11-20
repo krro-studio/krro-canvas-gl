@@ -63,6 +63,10 @@ public final class Render {
                     "Render.render must not be called on the GL thread — "
                             + "it would deadlock: the scheduled GL task can never run");
         }
+        // 视口退化
+        if (viewHeight < 1 || viewWidth < 1){
+            return CompletableFuture.completedFuture(ctx.newCanvas());
+        }
 
         long tStart = System.nanoTime();
 

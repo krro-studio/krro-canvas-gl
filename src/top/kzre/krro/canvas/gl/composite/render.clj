@@ -45,7 +45,9 @@
           (ImageRegion/none))]
     (if (or (nil? layer-stack)
             (empty? layer-stack)
-            (empty? dirty-tiles))
+            (empty? dirty-tiles)
+            (< view-width 1)
+            (< view-height 1))
       ;; 快速路径1, 没有需要合成的
       (promise/resolved backdrop-canvas)
       ;; 快速路径2，单个标准变换图层，空背景合成
